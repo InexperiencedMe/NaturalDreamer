@@ -1,5 +1,5 @@
 environmentName: CarRacing-v3
-runName: YourRunName
+runName: TwoHotTest_10
 seed: 1
 
 gradientSteps: 60000
@@ -61,18 +61,21 @@ dreamer:
         hiddenSize: 200
         numLayers: 2
         activation: Tanh
+        min_std: 0.1
         uniformMix: 0.01
 
     posteriorNet:
         hiddenSize: 200
         numLayers: 2
         activation: Tanh
+        min_std: 0.1
         uniformMix: 0.01
         
     reward:
         hiddenSize: 400
         numLayers: 2
         activation: Tanh
+        bins: 255
 
     continuation:
         hiddenSize: 400
@@ -81,13 +84,17 @@ dreamer:
     
     actor:
         hiddenSize: 400
-        numLayers: 2
+        min_std: 0.0001
+        init_std: 5.
+        mean_scale: 1
         activation: Tanh
+        numLayers: 2
 
     critic: 
         hiddenSize: 400
-        numLayers: 3 
         activation: Tanh
+        numLayers: 3
+        bins: 255
 
 folderNames:
     metricsFolder: metrics

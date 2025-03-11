@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 from networks import RecurrentModel, PriorNet, PosteriorNet, RewardModel, ContinueModel, EncoderConv, DecoderConv, Actor, Critic
-from utils import computeLambdaValues, Moments
+from utils import computeLambdaValues, Moments, TwoHotDistribution
 from buffer import ReplayBuffer
 import imageio
 
@@ -76,8 +76,8 @@ class Dreamer:
         reconstructionDistribution =  Independent(Normal(reconstructionMeans, 1), len(self.observationShape))
         reconstructionLoss         = -reconstructionDistribution.log_prob(data.observation[:, 1:]).mean()
 
-        rewardDistribution  =  self.rewardPredictor(fullStates)
-        rewardLoss          = -rewardDistribution.log_prob(data.reward[:, 1:].squeeze(-1)).mean()
+        rewardDistribution  =  TwoHotDistribution(self.rewardPredictor(fullStates))
+        rewardLoss          = -rewardDistribution.log_prob(data.reward[:, 1:]).mean()
 
         priorDistribution       = Independent(OneHotCategoricalStraightThrough(logits=priorsLogits              ), 1)
         priorDistributionSG     = Independent(OneHotCategoricalStraightThrough(logits=priorsLogits.detach()     ), 1)
@@ -129,8 +129,8 @@ class Dreamer:
         logprobs    = torch.stack(logprobs[1:],  dim=1)
         entropies   = torch.stack(entropies[1:], dim=1)
         
-        predictedRewards = self.rewardPredictor(fullStates[:, :-1]).mean
-        values           = self.critic(fullStates).mean
+        predictedRewards = TwoHotDistribution(self.rewardPredictor(fullStates[:, :-1])).mean
+        values           = TwoHotDistribution(self.critic(fullStates)).mean
         continues        = self.continuePredictor(fullStates).mean if self.config.useContinuationPrediction else torch.full_like(predictedRewards, self.config.discount)
         lambdaValues     = computeLambdaValues(predictedRewards, values, continues, self.config.lambda_)
 
@@ -144,8 +144,8 @@ class Dreamer:
         nn.utils.clip_grad_norm_(self.actor.parameters(), self.config.gradientClip, norm_type=self.config.gradientNormType)
         self.actorOptimizer.step()
 
-        valueDistributions  =  self.critic(fullStates[:, :-1].detach())
-        criticLoss          = -torch.mean(valueDistributions.log_prob(lambdaValues.detach()))
+        valueDistributions  =  TwoHotDistribution(self.critic(fullStates[:, :-1].detach()))
+        criticLoss          = -torch.mean(valueDistributions.log_prob(lambdaValues.unsqueeze(-1).detach()))
 
         self.criticOptimizer.zero_grad()
         criticLoss.backward()

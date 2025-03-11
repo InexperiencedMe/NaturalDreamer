@@ -65,11 +65,10 @@ class RewardModel(nn.Module):
     def __init__(self, inputSize, config):
         super().__init__()
         self.config = config
-        self.network = sequentialModel1D(inputSize, [self.config.hiddenSize]*self.config.numLayers, 2, self.config.activation)
+        self.network = sequentialModel1D(inputSize, [self.config.hiddenSize]*self.config.numLayers, config.bins, self.config.activation)
 
     def forward(self, x):
-        mean, logStd = self.network(x).chunk(2, dim=-1)
-        return Normal(mean.squeeze(-1), torch.exp(logStd).squeeze(-1))
+        return self.network(x)
 
 
 class ContinueModel(nn.Module):
@@ -155,8 +154,7 @@ class Critic(nn.Module):
     def __init__(self, inputSize, config):
         super().__init__()
         self.config = config
-        self.network = sequentialModel1D(inputSize, [self.config.hiddenSize]*self.config.numLayers, 2, self.config.activation)
+        self.network = sequentialModel1D(inputSize, [self.config.hiddenSize]*self.config.numLayers, config.bins, self.config.activation)
 
     def forward(self, x):
-        mean, logStd = self.network(x).chunk(2, dim=-1)
-        return Normal(mean.squeeze(-1), torch.exp(logStd).squeeze(-1))
+        return self.network(x)

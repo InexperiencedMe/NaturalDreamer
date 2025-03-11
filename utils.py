@@ -174,3 +174,41 @@ class Moments(nn.Module):
         self.high = self._decay*self.high + (1 - self._decay)*high
         inverseScale = torch.max(self._min, self.high - self.low)
         return self.low.detach(), inverseScale.detach()
+
+
+def symlog(x):
+    return torch.sign(x)*torch.log1p(torch.abs(x))
+
+
+def symexp(x):
+    return torch.sign(x)*torch.expm1(torch.abs(x))
+
+
+class TwoHotDistribution:
+    def __init__(self, logits, low = -10, high = 10):
+        self.probabilities    = F.softmax(logits, dim=-1)
+        self.logProbabilities = F.log_softmax(logits, dim=-1)
+        self.bins = torch.linspace(low, high, logits.shape[-1], device=logits.device)
+
+    @property
+    def mean(self):
+        return symexp((self.probabilities * self.bins).sum(dim=-1))
+
+    def log_prob(self, x):
+        x = symlog(x)
+        indexLow  = (self.bins <= x).type(torch.int32).sum(dim=-1, keepdim=True) - 1
+        indexLow  = torch.maximum(indexLow, torch.zeros_like(indexLow))
+        
+        indexHigh = indexLow + 1
+        indexHigh = torch.minimum(indexHigh, torch.full_like(indexHigh, len(self.bins) - 1))
+
+        equal = indexLow == indexHigh
+        distanceToLow  = torch.where(equal, 1, torch.abs(self.bins[indexLow]  - x))
+        distanceToHigh = torch.where(equal, 1, torch.abs(self.bins[indexHigh] - x))
+        total = distanceToLow + distanceToHigh
+        weightLow  = distanceToHigh / total
+        weightHigh = distanceToLow  / total
+
+        target = F.one_hot(indexLow, len(self.bins)).squeeze(-2)*weightLow + F.one_hot(indexHigh, len(self.bins)).squeeze(-2)*weightHigh
+        return (target*self.logProbabilities).sum(dim=-1)
+    
